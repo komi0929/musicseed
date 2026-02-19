@@ -35,13 +35,20 @@ const parseJSON = (text: string | undefined): any => {
 };
 
 /**
+ * Sanitize user input to reduce prompt injection risk.
+ */
+const sanitize = (s: string, maxLen = 200): string => {
+  return s.replace(/[`${}\\]/g, '').slice(0, maxLen);
+};
+
+/**
  * Step 1: Identify the song based on user input.
  */
 export const searchSongs = async (query: string): Promise<SongDetails[]> => {
   const modelId = "gemini-2.5-flash"; // Fast model for search
   
   const prompt = `
-    User Query: "${query}"
+    User Query: "${sanitize(query)}"
 
     Task:
     Search for music tracks that match the user's query.
@@ -91,7 +98,7 @@ export const analyzeAndGenerate = async (song: SongDetails): Promise<GeneratedRe
   const prompt = `
     You are an expert music producer and AI prompt engineer specialized in Suno AI (v3.5).
     
-    Target Song: "${song.title}" by "${song.artist}"
+    Target Song: "${sanitize(song.title)}" by "${sanitize(song.artist)}"
     
     TASK:
     1.  **RESEARCH**: Perform a THOROUGH research analysis on this song using Google Search.
@@ -164,7 +171,7 @@ export const refineResult = async (
     Current Suno Prompt: "${currentResult.sunoPrompt}"
     Current Lyrics: "${currentResult.lyrics}"
 
-    User Instruction: "${userInstruction}"
+    User Instruction: "${sanitize(userInstruction, 500)}"
 
     TASK:
     Update the content based on the instruction.

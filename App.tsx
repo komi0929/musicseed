@@ -12,10 +12,12 @@ import {
   Info,
   ExternalLink,
   ListMusic,
-  Disc
+  Disc,
+  Lock
 } from 'lucide-react';
 import { SongDetails, GeneratedResult, AppState } from './types';
 import * as gemini from './services/geminiService';
+import * as usage from './services/usageService';
 import { Button, Card, Input, SectionTitle, CopyBlock } from './components/UIComponents';
 
 const App = () => {
@@ -27,8 +29,27 @@ const App = () => {
   const [refinementInput, setRefinementInput] = useState('');
   const [isRefining, setIsRefining] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [remainingUses, setRemainingUses] = useState<number | null>(null);
+  const [usageLocked, setUsageLocked] = useState(false);
   
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Load usage count on mount
+  useEffect(() => {
+    const loadUsage = async () => {
+      try {
+        const status = await usage.hasRemainingUses();
+        setRemainingUses(status.remaining);
+        setUsageLocked(!status.allowed);
+      } catch (e) {
+        console.error('Usage check failed:', e);
+        // If Supabase is unavailable, allow usage
+        setRemainingUses(null);
+        setUsageLocked(false);
+      }
+    };
+    loadUsage();
+  }, []);
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
@@ -62,12 +83,29 @@ const App = () => {
 
   const handleConfirm = async () => {
     if (!songDetails) return;
+    
+    // Check usage limit
+    if (usageLocked) {
+      setErrorMsg('利用上限に達しました。');
+      return;
+    }
+    
     setCurrentState(AppState.ANALYZING);
     
     try {
       const genResult = await gemini.analyzeAndGenerate(songDetails);
       setResult(genResult);
       setCurrentState(AppState.RESULTS);
+      
+      // Increment usage after successful generation
+      try {
+        const newCount = await usage.incrementUsage();
+        const remaining = Math.max(0, usage.MAX_USES - newCount);
+        setRemainingUses(remaining);
+        if (remaining <= 0) setUsageLocked(true);
+      } catch (e) {
+        console.error('Usage tracking failed:', e);
+      }
     } catch (e: any) {
       console.error(e);
       setErrorMsg("分析に失敗しました。もう一度お試しください。");
@@ -94,14 +132,24 @@ const App = () => {
 
   const handleRefine = async () => {
     if (!refinementInput.trim() || !result) return;
-    
+
     setIsRefining(true);
     const oldInput = refinementInput;
     setRefinementInput(''); // Optimistic clear
 
     try {
-      const updatedResult = await gemini.refineResult(result, oldInput);
-      setResult(updatedResult);
+      const refined = await gemini.refineResult(result, oldInput);
+      setResult({ ...result, ...refined });
+
+      // Increment usage after successful refinement
+      try {
+        const newCount = await usage.incrementUsage();
+        const remaining = Math.max(0, usage.MAX_USES - newCount);
+        setRemainingUses(remaining);
+        if (remaining <= 0) setUsageLocked(true);
+      } catch (e) {
+        console.error('Usage tracking failed:', e);
+      }
     } catch (e) {
       console.error(e);
       // Revert input on error
@@ -140,6 +188,15 @@ const App = () => {
               最初からやり直す
             </button>
           )}
+          {remainingUses !== null && (
+            <div className={`text-xs px-2.5 py-1 rounded-full border ${
+              remainingUses <= 10 
+                ? 'border-red-500/30 text-red-400 bg-red-500/10' 
+                : 'border-slate-700 text-slate-400 bg-slate-800/50'
+            }`}>
+              残り {remainingUses} 回
+            </div>
+          )}
         </div>
       </header>
 
@@ -162,6 +219,7 @@ const App = () => {
               />
               <button 
                 onClick={handleSearch}
+                aria-label="検索"
                 className="absolute right-2 top-2 bottom-2 bg-slate-700 hover:bg-purple-600 text-white p-2 rounded-md transition-all"
               >
                 <ArrowRight className="w-5 h-5" />
