@@ -112,6 +112,7 @@ export const analyzeAndGenerate = async (song: SongDetails): Promise<GeneratedRe
            -   **NO ARTIST NAMES**.
            
         B. **lyrics** (Full Song Content):
+           -   **LANGUAGE**: Write lyrics in the **SAME LANGUAGE** as the original song. If the original song is in Japanese, write lyrics in Japanese. If in English, write in English. If it mixes languages, match that style.
            -   **FULL DURATION REQUIRED**: If the original is 4 mins, write lyrics for 4 mins.
            -   **MUST INCLUDE ALL SECTIONS**: [Intro], [Verse 1], [Pre-Chorus], [Chorus], [Verse 2], [Pre-Chorus], [Chorus], [Bridge], [Solo], [Last Chorus], [Outro].
            -   **ORIGINALITY**: NO keywords or title words from the original. Completely new metaphor/theme.

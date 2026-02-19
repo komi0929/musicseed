@@ -128,7 +128,7 @@ const App = () => {
               <Music className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">SUNO Creator</h1>
+              <h1 className="text-xl font-bold text-white tracking-tight">musicseed</h1>
               <p className="text-xs text-slate-400">AI音楽プロンプト生成ツール</p>
             </div>
           </div>
