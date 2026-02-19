@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { CheckCircle2, Copy } from 'lucide-react';
 
 export const Button = ({ 
   onClick, 
@@ -13,12 +14,12 @@ export const Button = ({
   className?: string;
   disabled?: boolean;
 }) => {
-  const baseStyle = "px-6 py-3 rounded-lg font-medium transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
+  const baseStyle = "px-6 py-3 rounded-xl font-semibold transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer active:scale-[0.97]";
   
   const variants = {
-    primary: "bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-lg hover:shadow-indigo-500/30 hover:scale-[1.02]",
-    secondary: "bg-slate-700 text-slate-100 hover:bg-slate-600 border border-slate-600",
-    ghost: "text-slate-400 hover:text-white hover:bg-slate-800/50"
+    primary: "bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 text-white shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 hover:scale-[1.02] hover:brightness-110 btn-glow",
+    secondary: "bg-slate-800/80 text-slate-100 hover:bg-slate-700 border border-slate-600/50 hover:border-purple-500/30",
+    ghost: "text-slate-400 hover:text-white hover:bg-white/5 rounded-lg"
   };
 
   return (
@@ -32,8 +33,8 @@ export const Button = ({
   );
 };
 
-export const Card = ({ children, className = '' }: { children?: React.ReactNode; className?: string }) => (
-  <div className={`bg-slate-800/60 backdrop-blur-md border border-slate-700/50 rounded-xl p-6 shadow-xl ${className}`}>
+export const Card = ({ children, className = '', hover = true }: { children?: React.ReactNode; className?: string; hover?: boolean }) => (
+  <div className={`glass-card rounded-2xl p-6 transition-all duration-300 ${hover ? '' : ''} ${className}`}>
     {children}
   </div>
 );
@@ -58,40 +59,75 @@ export const Input = ({
     onChange={onChange}
     onKeyDown={onKeyDown}
     placeholder={placeholder}
-    className="w-full bg-slate-900/80 border border-slate-600 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent placeholder-slate-500 transition-all"
+    className="w-full bg-slate-900/60 border border-slate-700/50 text-white rounded-xl px-5 py-4 focus:outline-none input-glow focus:border-purple-500/50 placeholder-slate-500 transition-all duration-300 text-base"
   />
 );
 
 export const SectionTitle = ({ children, icon: Icon }: { children?: React.ReactNode; icon?: any }) => (
-  <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-    {Icon && <Icon className="w-5 h-5 text-purple-400" />}
+  <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2.5">
+    {Icon && (
+      <div className="p-1.5 bg-purple-500/10 rounded-lg">
+        <Icon className="w-4 h-4 text-purple-400" />
+      </div>
+    )}
     {children}
   </h2>
 );
 
 export const CopyBlock = ({ text, label }: { text: string; label: string }) => {
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
+  const [flash, setFlash] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setFlash(true);
+    setTimeout(() => setCopied(false), 2500);
+    setTimeout(() => setFlash(false), 500);
   };
 
   return (
     <div className="relative group">
-      <div className="flex justify-between items-end mb-2">
-        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{label}</span>
+      <div className="flex justify-between items-center mb-2.5">
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{label}</span>
         <button 
           onClick={handleCopy}
-          className="text-xs bg-slate-700 hover:bg-slate-600 text-slate-200 px-2 py-1 rounded transition-colors"
+          aria-label={`${label}をコピー`}
+          className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-all duration-300 ${
+            copied 
+              ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' 
+              : 'bg-slate-800/60 hover:bg-slate-700/80 text-slate-300 border border-slate-700/50 hover:border-purple-500/30'
+          }`}
         >
-          {copied ? 'Copied!' : 'Copy'}
+          {copied ? (
+            <>
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              コピー完了
+            </>
+          ) : (
+            <>
+              <Copy className="w-3.5 h-3.5" />
+              コピー
+            </>
+          )}
         </button>
       </div>
-      <div className="bg-slate-950 rounded-lg p-4 border border-slate-700 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words leading-relaxed max-h-60 overflow-y-auto custom-scrollbar">
+      <div className={`bg-slate-950/80 rounded-xl p-4 border border-slate-800/50 text-sm text-slate-300 font-mono whitespace-pre-wrap break-words leading-relaxed max-h-72 overflow-y-auto transition-all duration-300 ${flash ? 'copy-flash' : ''}`}>
         {text}
       </div>
     </div>
+  );
+};
+
+export const Badge = ({ children, variant = 'default', className = '' }: { children: React.ReactNode; variant?: 'default' | 'warning' | 'success'; className?: string }) => {
+  const variants = {
+    default: 'border-slate-700/50 text-slate-400 bg-slate-800/50',
+    warning: 'border-amber-500/30 text-amber-400 bg-amber-500/10',
+    success: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+  };
+  return (
+    <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${variants[variant]} ${className}`}>
+      {children}
+    </span>
   );
 };

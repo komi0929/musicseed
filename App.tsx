@@ -1,24 +1,121 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Music, 
   Search, 
   Loader2, 
-  CheckCircle2, 
   XCircle, 
   Sparkles, 
   Send,
   ArrowRight,
   Info,
   ExternalLink,
-  ListMusic,
   Disc,
-  Lock
+  Clock,
+  Trash2,
+  ChevronDown,
+  Zap,
+  Waves,
+  MicVocal,
 } from 'lucide-react';
 import { SongDetails, GeneratedResult, AppState } from './types';
 import * as gemini from './services/geminiService';
 import * as usage from './services/usageService';
-import { Button, Card, Input, SectionTitle, CopyBlock } from './components/UIComponents';
+import * as history from './services/historyService';
+import { Button, Card, Input, SectionTitle, CopyBlock, Badge } from './components/UIComponents';
+
+// Floating music particles for background
+const MusicParticles = () => {
+  const notes = ['♪', '♫', '♬', '♩', '🎵', '🎶'];
+  const particles = useMemo(() => 
+    Array.from({ length: 8 }, (_, i) => ({
+      note: notes[i % notes.length],
+      left: `${8 + (i * 12)}%`,
+      delay: `${i * 1.2}s`,
+      duration: `${6 + (i % 4) * 2}s`,
+    }))
+  , []);
+
+  return (
+    <div className="bg-aurora">
+      {particles.map((p, i) => (
+        <span
+          key={i}
+          className="music-particle text-purple-400/30"
+          style={{
+            left: p.left,
+            animationDelay: p.delay,
+            animationDuration: p.duration,
+          }}
+        >
+          {p.note}
+        </span>
+      ))}
+    </div>
+  );
+};
+
+// Analysis progress steps
+const AnalysisProgress = () => {
+  const [step, setStep] = useState(0);
+  const steps = [
+    { icon: Search, label: '情報収集中', desc: 'レビュー・評論を検索...' },
+    { icon: Waves, label: '楽曲構造を解析中', desc: 'BPM・コード・構成を分析...' },
+    { icon: Zap, label: 'プロンプト構築中', desc: 'Suno AI用に最適化...' },
+  ];
+
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setStep(1), 2500),
+      setTimeout(() => setStep(2), 5500),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, []);
+
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center space-y-10 animate-fade-in">
+      {/* Spinning glow ring */}
+      <div className="relative w-24 h-24">
+        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-violet-600 via-purple-500 to-fuchsia-500 animate-spin-slow opacity-30 blur-md" />
+        <div className="absolute inset-2 rounded-full bg-slate-900/90 flex items-center justify-center">
+          <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
+        </div>
+      </div>
+
+      {/* Step indicators */}
+      <div className="flex flex-col gap-4 w-full max-w-xs">
+        {steps.map((s, i) => {
+          const Icon = s.icon;
+          const isActive = i === step;
+          const isDone = i < step;
+          return (
+            <div 
+              key={i} 
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-500 ${
+                isActive ? 'glass-card scale-105' : isDone ? 'opacity-50' : 'opacity-20'
+              }`}
+            >
+              <div className={`p-2 rounded-lg transition-all ${
+                isActive ? 'bg-purple-500/20' : 'bg-slate-800/50'
+              }`}>
+                <Icon className={`w-4 h-4 ${isActive ? 'text-purple-400' : 'text-slate-500'}`} />
+              </div>
+              <div className="text-left">
+                <p className={`text-sm font-medium ${isActive ? 'text-white' : 'text-slate-400'}`}>{s.label}</p>
+                <p className={`text-xs ${isActive ? 'text-slate-400' : 'text-slate-600'}`}>{s.desc}</p>
+              </div>
+              {isActive && (
+                <div className="ml-auto">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
 
 const App = () => {
   const [currentState, setCurrentState] = useState<AppState>(AppState.IDLE);
@@ -31,10 +128,13 @@ const App = () => {
   const [errorMsg, setErrorMsg] = useState('');
   const [remainingUses, setRemainingUses] = useState<number | null>(null);
   const [usageLocked, setUsageLocked] = useState(false);
+  const [activeTab, setActiveTab] = useState<'prompt' | 'lyrics'>('prompt');
+  const [historyItems, setHistoryItems] = useState<history.HistoryItem[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // Load usage count on mount
+  // Load usage count + history on mount
   useEffect(() => {
     const loadUsage = async () => {
       try {
@@ -43,12 +143,12 @@ const App = () => {
         setUsageLocked(!status.allowed);
       } catch (e) {
         console.error('Usage check failed:', e);
-        // If Supabase is unavailable, allow usage
         setRemainingUses(null);
         setUsageLocked(false);
       }
     };
     loadUsage();
+    setHistoryItems(history.getHistory());
   }, []);
 
   const handleSearch = async () => {
@@ -84,7 +184,6 @@ const App = () => {
   const handleConfirm = async () => {
     if (!songDetails) return;
     
-    // Check usage limit
     if (usageLocked) {
       setErrorMsg('利用上限に達しました。');
       return;
@@ -97,7 +196,11 @@ const App = () => {
       setResult(genResult);
       setCurrentState(AppState.RESULTS);
       
-      // Increment usage after successful generation
+      // Save to history
+      history.saveToHistory(songDetails, genResult);
+      setHistoryItems(history.getHistory());
+      
+      // Increment usage
       try {
         const newCount = await usage.incrementUsage();
         const remaining = Math.max(0, usage.MAX_USES - newCount);
@@ -116,8 +219,10 @@ const App = () => {
   const handleCancel = () => {
     setSongDetails(null);
     setCandidates([]);
+    setResult(null);
     setCurrentState(AppState.IDLE);
     setSearchQuery('');
+    setActiveTab('prompt');
   };
 
   const handleBackToSelect = () => {
@@ -128,20 +233,24 @@ const App = () => {
     }
   };
 
-
-
   const handleRefine = async () => {
     if (!refinementInput.trim() || !result) return;
 
     setIsRefining(true);
     const oldInput = refinementInput;
-    setRefinementInput(''); // Optimistic clear
+    setRefinementInput('');
 
     try {
       const refined = await gemini.refineResult(result, oldInput);
-      setResult({ ...result, ...refined });
+      const newResult = { ...result, ...refined };
+      setResult(newResult);
 
-      // Increment usage after successful refinement
+      // Update history with refined result
+      if (songDetails) {
+        history.saveToHistory(songDetails, newResult);
+        setHistoryItems(history.getHistory());
+      }
+
       try {
         const newCount = await usage.incrementUsage();
         const remaining = Math.max(0, usage.MAX_USES - newCount);
@@ -152,12 +261,24 @@ const App = () => {
       }
     } catch (e) {
       console.error(e);
-      // Revert input on error
       setRefinementInput(oldInput);
       alert("調整に失敗しました。もう一度お試しください。");
     } finally {
       setIsRefining(false);
     }
+  };
+
+  const loadFromHistory = (item: history.HistoryItem) => {
+    setSongDetails(item.song);
+    setResult(item.result);
+    setCurrentState(AppState.RESULTS);
+    setShowHistory(false);
+  };
+
+  const handleDeleteHistory = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    history.deleteHistoryItem(id);
+    setHistoryItems(history.getHistory());
   };
 
   useEffect(() => {
@@ -167,99 +288,175 @@ const App = () => {
   }, [result]);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-200 pb-20">
+    <div className="min-h-screen text-slate-200 pb-20 relative">
+      <MusicParticles />
+
       {/* Header */}
-      <header className="bg-slate-900/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
+      <header className="bg-slate-900/40 backdrop-blur-xl border-b border-white/5 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-tr from-indigo-500 to-purple-600 rounded-lg">
-              <Music className="w-6 h-6 text-white" />
+            <div className="p-2 bg-gradient-to-tr from-violet-600 to-fuchsia-500 rounded-xl shadow-lg shadow-purple-500/20">
+              <Music className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-white tracking-tight">musicseed</h1>
-              <p className="text-xs text-slate-400">AI音楽プロンプト生成ツール</p>
+              <h1 className="text-lg font-bold text-white tracking-tight">musicseed</h1>
+              <p className="text-[10px] text-slate-500 tracking-wider uppercase">AI Music Prompt Generator</p>
             </div>
           </div>
-          {currentState !== AppState.IDLE && (
-            <button 
-              onClick={handleCancel}
-              className="text-xs text-slate-500 hover:text-white transition-colors"
-            >
-              最初からやり直す
-            </button>
-          )}
-          {remainingUses !== null && (
-            <div className={`text-xs px-2.5 py-1 rounded-full border ${
-              remainingUses <= 10 
-                ? 'border-red-500/30 text-red-400 bg-red-500/10' 
-                : 'border-slate-700 text-slate-400 bg-slate-800/50'
-            }`}>
-              残り {remainingUses} 回
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {currentState !== AppState.IDLE && (
+              <button 
+                onClick={handleCancel}
+                className="text-xs text-slate-500 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
+              >
+                リセット
+              </button>
+            )}
+            {remainingUses !== null && (
+              <Badge variant={remainingUses <= 10 ? 'warning' : 'default'}>
+                残り {remainingUses} 回
+              </Badge>
+            )}
+          </div>
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-12 flex flex-col gap-12">
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col gap-10 relative z-10">
         
-        {/* Step 1: Search */}
+        {/* ===== IDLE: Search ===== */}
         {currentState === AppState.IDLE && (
-          <div className="flex flex-col items-center justify-center min-h-[50vh] animate-fade-in">
-            <div className="w-full max-w-lg text-center mb-8">
-              <h2 className="text-3xl font-bold text-white mb-3">参考にする楽曲は？</h2>
-              <p className="text-slate-400">曲名を入力してください。スタイル、雰囲気、歌詞などを徹底的に分析し、Suno AIに最適なプロンプトを生成します。</p>
-            </div>
-            <div className="w-full max-w-xl relative">
-              <Input 
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="例: Blinding Lights / The Weeknd"
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                autoFocus
-              />
-              <button 
-                onClick={handleSearch}
-                aria-label="検索"
-                className="absolute right-2 top-2 bottom-2 bg-slate-700 hover:bg-purple-600 text-white p-2 rounded-md transition-all"
-              >
-                <ArrowRight className="w-5 h-5" />
-              </button>
-            </div>
-            {errorMsg && (
-              <p className="mt-4 text-red-400 bg-red-400/10 px-4 py-2 rounded-lg text-sm flex items-center gap-2">
-                <XCircle className="w-4 h-4" /> {errorMsg}
+          <div className="flex flex-col items-center justify-center min-h-[55vh] animate-fade-in">
+            {/* Hero */}
+            <div className="w-full max-w-lg text-center mb-10">
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-purple-500/20 bg-purple-500/5 text-purple-300 text-xs font-medium mb-6 animate-bounce-subtle">
+                <Sparkles className="w-3.5 h-3.5" />
+                Powered by Gemini AI
+              </div>
+              <h2 className="hero-title text-3xl sm:text-4xl font-bold text-white mb-4 leading-tight">
+                参考にする<br className="sm:hidden" />楽曲は？
+              </h2>
+              <p className="hero-subtitle text-slate-400 text-sm sm:text-base leading-relaxed">
+                楽曲を徹底分析し、Suno AI に最適なプロンプトとオリジナル歌詞を生成します
               </p>
+            </div>
+
+            {/* Search input */}
+            <div className="w-full max-w-xl relative group">
+              <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/20 via-purple-600/20 to-fuchsia-600/20 rounded-2xl blur-lg opacity-0 group-focus-within:opacity-100 transition-all duration-500" />
+              <div className="relative flex">
+                <Input 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="例: Blinding Lights / The Weeknd"
+                  onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+                  autoFocus
+                />
+                <button 
+                  onClick={handleSearch}
+                  aria-label="検索"
+                  className="absolute right-2 top-2 bottom-2 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white p-2.5 rounded-lg transition-all duration-300 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 active:scale-95"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Error message */}
+            {errorMsg && (
+              <div className="mt-5 animate-fade-in-down">
+                <p className="text-red-400 bg-red-400/10 border border-red-500/20 px-4 py-2.5 rounded-xl text-sm flex items-center gap-2">
+                  <XCircle className="w-4 h-4 shrink-0" /> {errorMsg}
+                </p>
+              </div>
+            )}
+
+            {/* History section */}
+            {historyItems.length > 0 && (
+              <div className="w-full max-w-xl mt-10 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+                <button
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-300 transition-colors mb-3"
+                >
+                  <Clock className="w-4 h-4" />
+                  最近の生成履歴
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showHistory ? 'rotate-180' : ''}`} />
+                </button>
+                {showHistory && (
+                  <div className="space-y-2 animate-fade-in-down stagger-children">
+                    {historyItems.slice(0, 5).map((item) => (
+                      <button
+                        key={item.id}
+                        onClick={() => loadFromHistory(item)}
+                        className="w-full glass-card !p-3 rounded-xl flex items-center justify-between group hover:border-purple-500/20 transition-all text-left"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="p-1.5 bg-purple-500/10 rounded-lg shrink-0">
+                            <Disc className="w-3.5 h-3.5 text-purple-400" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-white truncate">{item.song.title}</p>
+                            <p className="text-xs text-slate-500 truncate">{item.song.artist}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-[10px] text-slate-600">
+                            {new Date(item.createdAt).toLocaleDateString('ja-JP', { month: 'short', day: 'numeric' })}
+                          </span>
+                          <button
+                            onClick={(e) => handleDeleteHistory(e, item.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-500/10 rounded transition-all"
+                            aria-label="削除"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-slate-500 hover:text-red-400" />
+                          </button>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
 
-        {/* Step 2: Searching Indicator */}
+        {/* ===== SEARCHING ===== */}
         {currentState === AppState.SEARCHING && (
-          <div className="flex flex-col items-center justify-center py-20 animate-pulse">
-            <Search className="w-12 h-12 text-purple-500 mb-4" />
-            <h3 className="text-xl font-medium text-white">楽曲を検索中...</h3>
+          <div className="flex flex-col items-center justify-center py-20 animate-fade-in">
+            <div className="relative">
+              <div className="absolute inset-0 bg-purple-500 blur-2xl opacity-15 animate-pulse" />
+              <Search className="w-12 h-12 text-purple-400 animate-bounce-subtle relative z-10" />
+            </div>
+            <h3 className="text-xl font-semibold text-white mt-6">楽曲を検索中...</h3>
+            <p className="text-sm text-slate-500 mt-2">Google検索で楽曲情報を収集しています</p>
           </div>
         )}
 
-        {/* Step 2.5: Selecting Candidate */}
+        {/* ===== SELECTING ===== */}
         {currentState === AppState.SELECTING && (
-          <div className="flex flex-col items-center animate-fade-in w-full">
-            <h2 className="text-2xl font-bold text-white mb-6">楽曲を選択してください</h2>
-            <div className="grid gap-4 w-full max-w-lg">
+          <div className="flex flex-col items-center animate-fade-in-up w-full">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-bold text-white mb-2">楽曲を選択</h2>
+              <p className="text-sm text-slate-400">正しい楽曲をタップしてください</p>
+            </div>
+            <div className="grid gap-3 w-full max-w-lg stagger-children">
               {candidates.map((song, idx) => (
                 <button
                   key={idx}
                   onClick={() => selectCandidate(song)}
-                  className="bg-slate-800/60 hover:bg-slate-700/80 border border-slate-700 hover:border-purple-500/50 rounded-xl p-4 text-left transition-all group"
+                  className="glass-card !p-4 rounded-xl text-left transition-all group hover:border-purple-500/30 active:scale-[0.98]"
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-bold text-white group-hover:text-purple-300 transition-colors">{song.title}</h3>
-                      <p className="text-slate-300">{song.artist}</p>
+                  <div className="flex justify-between items-start gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-bold text-white group-hover:text-purple-300 transition-colors truncate">{song.title}</h3>
+                      <p className="text-slate-300 text-sm">{song.artist}</p>
                     </div>
-                    {song.year && <span className="text-xs bg-slate-900 text-slate-400 px-2 py-1 rounded">{song.year}</span>}
+                    {song.year && (
+                      <span className="text-xs bg-slate-900/80 text-slate-400 px-2 py-0.5 rounded-md shrink-0">{song.year}</span>
+                    )}
                   </div>
-                  {song.description && <p className="text-xs text-slate-500 mt-2 line-clamp-1">{song.description}</p>}
+                  {song.description && (
+                    <p className="text-xs text-slate-500 mt-2 line-clamp-1">{song.description}</p>
+                  )}
                 </button>
               ))}
             </div>
@@ -267,98 +464,143 @@ const App = () => {
           </div>
         )}
 
-        {/* Step 3: Confirmation */}
+        {/* ===== CONFIRMING ===== */}
         {currentState === AppState.CONFIRMING && songDetails && (
-          <div className="flex flex-col items-center animate-fade-in-up">
-            <Card className="w-full max-w-lg border-purple-500/30 shadow-purple-500/10">
-              <div className="text-center mb-6">
-                <h3 className="text-sm uppercase tracking-widest text-purple-400 font-semibold mb-2">この曲で間違いありませんか？</h3>
+          <div className="flex flex-col items-center animate-scale-in">
+            <Card className="w-full max-w-lg border-purple-500/20 animate-pulse-glow">
+              <div className="text-center mb-8">
+                <div className="inline-flex p-3 bg-purple-500/10 rounded-2xl mb-4">
+                  <MicVocal className="w-8 h-8 text-purple-400" />
+                </div>
+                <h3 className="text-xs uppercase tracking-[0.2em] text-purple-400 font-semibold mb-3">この曲で合っていますか？</h3>
                 <h2 className="text-2xl font-bold text-white mb-1">{songDetails.title}</h2>
                 <p className="text-lg text-slate-300">{songDetails.artist}</p>
-                {songDetails.year && <span className="inline-block mt-2 px-3 py-1 bg-slate-800 rounded-full text-xs text-slate-400">{songDetails.year}</span>}
-                {songDetails.description && <p className="mt-4 text-sm text-slate-400 italic">"{songDetails.description}"</p>}
+                {songDetails.year && (
+                  <span className="inline-block mt-3 px-3 py-1 bg-slate-900/60 rounded-full text-xs text-slate-400 border border-slate-700/30">
+                    {songDetails.year}
+                  </span>
+                )}
+                {songDetails.description && (
+                  <p className="mt-4 text-sm text-slate-400 italic leading-relaxed">"{songDetails.description}"</p>
+                )}
               </div>
-              <div className="flex gap-4 justify-center">
+
+              {errorMsg && (
+                <p className="text-red-400 bg-red-400/10 border border-red-500/20 px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 mb-4">
+                  <XCircle className="w-4 h-4 shrink-0" /> {errorMsg}
+                </p>
+              )}
+
+              <div className="flex gap-3 justify-center">
                 <Button variant="secondary" onClick={handleBackToSelect}>いいえ、戻る</Button>
-                <Button onClick={handleConfirm}>はい、分析する</Button>
+                <Button onClick={handleConfirm}>
+                  <Sparkles className="w-4 h-4" />
+                  分析する
+                </Button>
               </div>
             </Card>
           </div>
         )}
 
-        {/* Step 4: Analyzing Indicator */}
+        {/* ===== ANALYZING ===== */}
         {currentState === AppState.ANALYZING && (
-          <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
-            <div className="relative">
-              <div className="absolute inset-0 bg-purple-500 blur-xl opacity-20 animate-pulse"></div>
-              <Loader2 className="w-16 h-16 text-purple-400 animate-spin relative z-10" />
-            </div>
-            <div>
-              <h3 className="text-2xl font-bold text-white mb-2">徹底的に分析中...</h3>
-              <div className="flex flex-col gap-2 text-sm text-slate-400 animate-pulse">
-                <p>レビューや感想を収集中...</p>
-                <p>楽曲構造を解析中...</p>
-                <p>最適なプロンプトを構築中...</p>
-              </div>
-            </div>
-          </div>
+          <AnalysisProgress />
         )}
 
-        {/* Step 5: Results */}
+        {/* ===== RESULTS ===== */}
         {result && (currentState === AppState.RESULTS) && (
-          <div className="space-y-8 animate-fade-in-up">
+          <div className="space-y-6 animate-fade-in-up">
             
-            {/* Reasoning / Insight Header */}
-            {result.reasoning && (
-               <div className="bg-indigo-900/20 border border-indigo-500/30 rounded-lg p-4 flex gap-3 items-start">
-                 <Info className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
-                 <div>
-                   <h4 className="font-semibold text-indigo-300 mb-1">分析インサイト</h4>
-                   <p className="text-sm text-indigo-100/80 leading-relaxed">{result.reasoning}</p>
-                 </div>
-               </div>
+            {/* Song info badge */}
+            {songDetails && (
+              <div className="text-center animate-fade-in-down">
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card !p-2 !px-4 text-sm">
+                  <Disc className="w-4 h-4 text-purple-400" />
+                  <span className="font-medium text-white">{songDetails.title}</span>
+                  <span className="text-slate-500">—</span>
+                  <span className="text-slate-300">{songDetails.artist}</span>
+                </div>
+              </div>
             )}
 
+            {/* Insight */}
+            {result.reasoning && (
+              <Card className="border-indigo-500/20 !bg-indigo-950/20">
+                <div className="flex gap-3 items-start">
+                  <div className="p-2 bg-indigo-500/10 rounded-lg shrink-0">
+                    <Info className="w-4 h-4 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-indigo-300 mb-1 text-sm">分析インサイト</h4>
+                    <p className="text-sm text-indigo-100/70 leading-relaxed">{result.reasoning}</p>
+                  </div>
+                </div>
+              </Card>
+            )}
 
+            {/* Tabs */}
+            <div className="flex border-b border-slate-800/50 gap-6">
+              <button 
+                onClick={() => setActiveTab('prompt')}
+                className={`pb-3 text-sm font-medium transition-all ${activeTab === 'prompt' ? 'tab-active' : 'tab-inactive'}`}
+              >
+                <span className="flex items-center gap-2">
+                  <Disc className="w-4 h-4" />
+                  スタイルプロンプト
+                </span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('lyrics')}
+                className={`pb-3 text-sm font-medium transition-all ${activeTab === 'lyrics' ? 'tab-active' : 'tab-inactive'}`}
+              >
+                <span className="flex items-center gap-2">
+                  <Music className="w-4 h-4" />
+                  歌詞
+                </span>
+              </button>
+            </div>
 
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Left Column: Style Prompts */}
-              <div className="space-y-6">
-                <Card className="h-full flex flex-col">
-                  <SectionTitle icon={Disc}>スタイルプロンプト (Suno用)</SectionTitle>
-                  <div className="flex-1 space-y-6">
-                    <CopyBlock label="English Prompt (そのまま使用)" text={result.sunoPrompt} />
-                    
-                    <div className="pt-4 border-t border-slate-700/50">
-                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">日本語訳 (参考)</span>
-                      <p className="text-sm text-slate-300 leading-relaxed">
+            {/* Tab content */}
+            <div className="animate-fade-in" key={activeTab}>
+              {activeTab === 'prompt' && (
+                <Card>
+                  <SectionTitle icon={Disc}>Suno スタイルプロンプト</SectionTitle>
+                  <div className="space-y-6">
+                    <CopyBlock label="English Prompt (そのまま貼り付け)" text={result.sunoPrompt} />
+                    <div className="pt-4 border-t border-slate-700/30">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2 block">日本語訳（参考）</span>
+                      <p className="text-sm text-slate-400 leading-relaxed">
                         {result.sunoPromptTranslation}
                       </p>
                     </div>
+                    <div className="flex items-center gap-2 text-xs text-slate-600">
+                      <span>{result.sunoPrompt.length} 文字</span>
+                      <span>•</span>
+                      <span>{result.sunoPrompt.length >= 700 && result.sunoPrompt.length <= 999 ? '✓ 最適な長さ' : '⚠ 長さが範囲外'}</span>
+                    </div>
                   </div>
                 </Card>
-              </div>
+              )}
 
-              {/* Right Column: Lyrics */}
-              <div className="space-y-6">
-                <Card className="h-full">
-                  <SectionTitle icon={Music}>歌詞</SectionTitle>
+              {activeTab === 'lyrics' && (
+                <Card>
+                  <SectionTitle icon={Music}>オリジナル歌詞</SectionTitle>
                   <CopyBlock label="Lyrics" text={result.lyrics} />
                 </Card>
-              </div>
+              )}
             </div>
-            
+
             {/* Sources */}
             {result.sources && result.sources.length > 0 && (
-              <div className="text-xs text-slate-500 flex flex-wrap gap-x-4 gap-y-1 items-center justify-center">
-                <span>参照ソース:</span>
+              <div className="text-xs text-slate-600 flex flex-wrap gap-x-4 gap-y-1.5 items-center justify-center py-2">
+                <span className="text-slate-500">参照ソース:</span>
                 {result.sources.map((source, idx) => (
                   <a 
                     key={idx} 
                     href={source.uri} 
                     target="_blank" 
                     rel="noopener noreferrer"
-                    className="flex items-center gap-1 hover:text-purple-400 transition-colors underline decoration-slate-700 underline-offset-2"
+                    className="flex items-center gap-1 hover:text-purple-400 transition-colors underline decoration-slate-700/50 underline-offset-2"
                   >
                     {source.title} <ExternalLink className="w-3 h-3" />
                   </a>
@@ -367,27 +609,27 @@ const App = () => {
             )}
 
             {/* Refinement Chat */}
-            <div className="sticky bottom-6 z-40" ref={bottomRef}>
-              <Card className="shadow-2xl shadow-purple-900/20 border-purple-500/20 bg-slate-800/90 backdrop-blur-xl">
-                <div className="flex gap-3">
-                  <div className="flex-1">
+            <div className="sticky bottom-4 z-40" ref={bottomRef}>
+              <Card className="shadow-2xl shadow-purple-900/30 border-purple-500/20 !bg-slate-900/90 backdrop-blur-2xl">
+                <div className="flex gap-3 items-center">
+                  <div className="flex-1 min-w-0">
                     <input
                       type="text"
                       value={refinementInput}
                       onChange={(e) => setRefinementInput(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && !isRefining && handleRefine()}
-                      placeholder="もっとアップテンポに？歌詞を変えたい？指示を入力してください..."
+                      placeholder="もっとアップテンポに？歌詞を変えたい？指示を入力..."
                       disabled={isRefining}
-                      className="w-full bg-transparent border-none focus:ring-0 text-white placeholder-slate-500 py-2 px-2"
+                      className="w-full bg-transparent border-none focus:ring-0 focus:outline-none text-white placeholder-slate-500 py-1.5 text-sm"
                     />
                   </div>
-                  <Button 
+                  <button 
                     onClick={handleRefine} 
                     disabled={isRefining || !refinementInput.trim()}
-                    className="!px-4 !py-2 !rounded-md"
+                    className="p-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 rounded-xl text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 shadow-lg shadow-purple-500/20"
                   >
-                    {isRefining ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-                  </Button>
+                    {isRefining ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </button>
                 </div>
               </Card>
             </div>
@@ -395,6 +637,15 @@ const App = () => {
           </div>
         )}
       </main>
+
+      {/* Footer */}
+      <footer className="relative z-10 border-t border-white/5 mt-auto">
+        <div className="max-w-4xl mx-auto px-6 py-6 text-center">
+          <p className="text-xs text-slate-600">
+            musicseed • Powered by Google Gemini AI
+          </p>
+        </div>
+      </footer>
     </div>
   );
 };
