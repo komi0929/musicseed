@@ -33,8 +33,8 @@ export const Button = ({
   );
 };
 
-export const Card = ({ children, className = '', hover = true }: { children?: React.ReactNode; className?: string; hover?: boolean }) => (
-  <div className={`glass-card rounded-2xl p-6 transition-all duration-300 ${hover ? '' : ''} ${className}`}>
+export const Card = ({ children, className = '' }: { children?: React.ReactNode; className?: string }) => (
+  <div className={`glass-card rounded-2xl p-6 transition-all duration-300 ${className}`}>
     {children}
   </div>
 );

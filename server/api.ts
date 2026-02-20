@@ -19,8 +19,12 @@ const getAI = (): GoogleGenAI => {
 
 const parseJSON = (text: string | undefined): any => {
   if (!text) return null;
-  const clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
-  return JSON.parse(clean);
+  try {
+    const clean = text.replace(/```json/g, "").replace(/```/g, "").trim();
+    return JSON.parse(clean);
+  } catch {
+    throw { status: 500, message: "AIレスポンスの解析に失敗しました。再試行してください。" };
+  }
 };
 
 /**
@@ -36,6 +40,14 @@ const sanitize = (s: string, maxLen = 200): string =>
 const rateLimitMap = new Map<string, { ts: number; count: number }>();
 const RATE_WINDOW_MS = 60_000;  // 1-min window
 const RATE_MAX_CALLS = 10;       // max 10 calls per window
+
+// Cleanup stale entries every 5 minutes to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now - entry.ts > RATE_WINDOW_MS * 5) rateLimitMap.delete(ip);
+  }
+}, 300_000);
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
@@ -188,6 +200,7 @@ export async function handleRefine(body: any, ip: string) {
     
     Output JSON structure (fill all fields even if unchanged):
     {
+       "reasoning": "A brief summary in JAPANESE of what you changed and why.",
        "sunoPrompt": "...", 
        "sunoPromptTranslation": "...",
        "lyrics": "..."
@@ -202,11 +215,12 @@ export async function handleRefine(body: any, ip: string) {
       responseSchema: {
         type: Type.OBJECT,
         properties: {
+          reasoning: { type: Type.STRING },
           sunoPrompt: { type: Type.STRING },
           sunoPromptTranslation: { type: Type.STRING },
           lyrics: { type: Type.STRING },
         },
-        required: ["sunoPrompt", "sunoPromptTranslation", "lyrics"],
+        required: ["reasoning", "sunoPrompt", "sunoPromptTranslation", "lyrics"],
       },
     },
   });
