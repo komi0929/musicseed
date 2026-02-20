@@ -18,6 +18,7 @@ import {
   Waves,
   MicVocal,
 } from 'lucide-react';
+import { TermsModal, PrivacyModal, ContactModal } from './components/LegalModals';
 import { SongDetails, GeneratedResult, AppState } from './types';
 import * as gemini from './services/geminiService';
 import * as usage from './services/usageService';
@@ -131,6 +132,9 @@ const App = () => {
   const [activeTab, setActiveTab] = useState<'prompt' | 'lyrics'>('prompt');
   const [historyItems, setHistoryItems] = useState<history.HistoryItem[]>([]);
   const [showHistory, setShowHistory] = useState(false);
+  const [showTerms, setShowTerms] = useState(false);
+  const [showPrivacy, setShowPrivacy] = useState(false);
+  const [showContact, setShowContact] = useState(false);
   
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -638,12 +642,25 @@ const App = () => {
         )}
       </main>
 
+      {/* Legal Modals */}
+      <TermsModal isOpen={showTerms} onClose={() => setShowTerms(false)} />
+      <PrivacyModal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} />
+      <ContactModal isOpen={showContact} onClose={() => setShowContact(false)} />
+
       {/* Footer */}
       <footer className="relative z-10 border-t border-white/5 mt-auto">
-        <div className="max-w-4xl mx-auto px-6 py-6 text-center">
-          <p className="text-xs text-slate-600">
-            musicseed • Powered by Google Gemini AI
-          </p>
+        <div className="max-w-4xl mx-auto px-6 py-8 space-y-4">
+          <div className="flex items-center justify-center gap-1 flex-wrap">
+            <button onClick={() => setShowTerms(true)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1">利用規約</button>
+            <span className="text-slate-700">|</span>
+            <button onClick={() => setShowPrivacy(true)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1">プライバシーポリシー</button>
+            <span className="text-slate-700">|</span>
+            <button onClick={() => setShowContact(true)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1">お問い合わせ</button>
+          </div>
+          <div className="text-center space-y-1">
+            <p className="text-xs text-slate-600">musicseed • Powered by Google Gemini AI</p>
+            <p className="text-xs text-slate-700">© 2026 株式会社ヒトコト</p>
+          </div>
         </div>
       </footer>
     </div>
