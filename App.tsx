@@ -75,15 +75,7 @@ const AnalysisProgress = () => {
   }, []);
 
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center space-y-10 animate-fade-in">
-      {/* Spinning glow ring */}
-      <div className="relative w-24 h-24">
-        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-violet-600 via-purple-500 to-fuchsia-500 animate-spin-slow opacity-30 blur-md" />
-        <div className="absolute inset-2 rounded-full bg-slate-900/90 flex items-center justify-center">
-          <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
-        </div>
-      </div>
-
+    <div className="flex flex-col items-center justify-center py-16 text-center animate-fade-in">
       {/* Step indicators */}
       <div className="flex flex-col gap-4 w-full max-w-xs">
         {steps.map((s, i) => {
