@@ -30,4 +30,5 @@ build_result.txt
 build_stderr.txt
 build_stdout.txt
 build_log.txt
+build_out.txt
 metadata.json
