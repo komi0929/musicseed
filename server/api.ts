@@ -40,17 +40,19 @@ const sanitize = (s: string, maxLen = 200): string =>
 const rateLimitMap = new Map<string, { ts: number; count: number }>();
 const RATE_WINDOW_MS = 60_000;  // 1-min window
 const RATE_MAX_CALLS = 10;       // max 10 calls per window
-
-// Cleanup stale entries every 5 minutes to prevent memory leak
-setInterval(() => {
-  const now = Date.now();
-  for (const [ip, entry] of rateLimitMap) {
-    if (now - entry.ts > RATE_WINDOW_MS * 5) rateLimitMap.delete(ip);
-  }
-}, 300_000);
+let _lastCleanup = Date.now();
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
+
+  // Inline cleanup every 5 minutes (no setInterval to avoid blocking process exit)
+  if (now - _lastCleanup > 300_000) {
+    _lastCleanup = now;
+    for (const [key, entry] of rateLimitMap) {
+      if (now - entry.ts > RATE_WINDOW_MS * 5) rateLimitMap.delete(key);
+    }
+  }
+
   const entry = rateLimitMap.get(ip);
   if (!entry || now - entry.ts > RATE_WINDOW_MS) {
     rateLimitMap.set(ip, { ts: now, count: 1 });
