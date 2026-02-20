@@ -332,10 +332,7 @@ const App = () => {
           <div className="flex flex-col items-center justify-center min-h-[55vh] animate-fade-in">
             {/* Hero */}
             <div className="w-full max-w-lg text-center mb-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-purple-500/20 bg-purple-500/5 text-purple-300 text-xs font-medium mb-6 animate-bounce-subtle">
-                <Sparkles className="w-3.5 h-3.5" />
-                Powered by Gemini AI
-              </div>
+
               <h2 className="hero-title text-3xl sm:text-4xl font-bold text-white mb-4 leading-tight">
                 参考にする<br className="sm:hidden" />楽曲は？
               </h2>
@@ -657,8 +654,7 @@ const App = () => {
             <span className="text-slate-700">|</span>
             <button onClick={() => setShowContact(true)} className="text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1">お問い合わせ</button>
           </div>
-          <div className="text-center space-y-1">
-            <p className="text-xs text-slate-600">musicseed • Powered by Google Gemini AI</p>
+          <div className="text-center">
             <p className="text-xs text-slate-700">© 2026 株式会社ヒトコト</p>
           </div>
         </div>
