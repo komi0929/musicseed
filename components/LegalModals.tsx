@@ -65,7 +65,7 @@ export const TermsModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: () =
     <p>当社は、ユーザーに通知することなく本規約を変更することができるものとします。変更後の利用規約は、本サービス上に表示した時点より効力を生じるものとします。</p>
 
     <h3 className="text-white font-semibold pt-2">第8条（準拠法・裁判管轄）</h3>
-    <p>本規約の解釈にあたっては日本法を準拠法とします。本サービスに関して紛争が生じた場合には、東京地方裁判所を第一審の専属的合意管轄とします。</p>
+    <p>本規約の解釈にあたっては日本法を準拠法とします。本サービスに関して紛争が生じた場合には、福岡地方裁判所を第一審の専属的合意管轄とします。</p>
 
     <div className="pt-4 border-t border-slate-800/50 text-xs text-slate-500">
       <p>株式会社ヒトコト</p>
