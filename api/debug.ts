@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   
   // Check 4: Try importing shared module
   try {
-    const shared = await import('./_shared');
+    const shared = await import('./handlers');
     checks['shared_import'] = 'OK (keys: ' + Object.keys(shared).join(', ') + ')';
   } catch (e: any) {
     checks['shared_import'] = 'FAILED: ' + e.message;

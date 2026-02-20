@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { handleAnalyze } from './_shared';
+import { handleAnalyze } from './handlers';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
