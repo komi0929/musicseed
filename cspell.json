@@ -1,0 +1,29 @@
+{
+  "version": "0.2",
+  "language": "en,ja",
+  "words": [
+    "musicseed",
+    "suno",
+    "Suno",
+    "supabase",
+    "Supabase",
+    "genai",
+    "plpgsql",
+    "Enka",
+    "Hana",
+    "Itoshi",
+    "Stratocaster",
+    "arpeggiated",
+    "melismatic",
+    "Weeknd",
+    "uuidv",
+    "PGRST",
+    "ntvs",
+    "njsproj"
+  ],
+  "ignorePaths": [
+    "node_modules",
+    "dist",
+    "package-lock.json"
+  ]
+}

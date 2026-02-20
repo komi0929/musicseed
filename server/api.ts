@@ -191,7 +191,7 @@ export async function handleRefine(body: any, ip: string) {
   if (!checkRateLimit(ip)) throw { status: 429, message: "Rate limit exceeded" };
 
   const sunoPrompt = sanitize(String(body.sunoPrompt ?? ""), 1200);
-  const lyrics = String(body.lyrics ?? "").slice(0, 5000);
+  const lyrics = String(body.lyrics ?? "").replace(/[`${}\\]/g, "").slice(0, 5000);
   const instruction = sanitize(String(body.instruction ?? ""), 500);
   if (!instruction) throw { status: 400, message: "instruction is required" };
 
@@ -238,5 +238,5 @@ export async function handleRefine(body: any, ip: string) {
 
   const text = response.text;
   if (!text) throw { status: 500, message: "No response from Gemini." };
-  return JSON.parse(text);
+  return parseJSON(text);
 }

@@ -282,11 +282,12 @@ const App = () => {
       setShowRefineSuccess(true);
       setTimeout(() => setShowRefineSuccess(false), 3000);
     } catch (e) {
+      stepTimers.forEach(clearTimeout);
       console.error(e);
       setRefinementInput(oldInput);
       setRefineInstruction('');
       setIsRefining(false);
-      alert("調整に失敗しました。もう一度お試しください。");
+      setErrorMsg("調整に失敗しました。もう一度お試しください。");
     }
   };
 
@@ -307,7 +308,7 @@ const App = () => {
     if (currentState === AppState.RESULTS) {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [result]);
+  }, [result, currentState]);
 
   return (
     <div className="min-h-screen text-slate-200 pb-20 relative">
@@ -576,7 +577,7 @@ const App = () => {
             {/* Song info badge */}
             {songDetails && (
               <div className="text-center animate-fade-in-down">
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card !p-2 !px-4 text-sm">
+                <div className="inline-flex items-center gap-2 py-2 rounded-full glass-card !p-2 !px-4 text-sm">
                   <Disc className="w-4 h-4 text-purple-400" />
                   <span className="font-medium text-white">{songDetails.title}</span>
                   <span className="text-slate-500">—</span>
