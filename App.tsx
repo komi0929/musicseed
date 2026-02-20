@@ -17,6 +17,7 @@ import {
   Zap,
   Waves,
   MicVocal,
+  CheckCircle2,
 } from 'lucide-react';
 import { TermsModal, PrivacyModal, ContactModal } from './components/LegalModals';
 import { SongDetails, GeneratedResult, AppState } from './types';
@@ -135,6 +136,9 @@ const App = () => {
   const [showTerms, setShowTerms] = useState(false);
   const [showPrivacy, setShowPrivacy] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [refineStep, setRefineStep] = useState(0);
+  const [refineInstruction, setRefineInstruction] = useState('');
+  const [showRefineSuccess, setShowRefineSuccess] = useState(false);
   
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -241,11 +245,20 @@ const App = () => {
     if (!refinementInput.trim() || !result) return;
 
     setIsRefining(true);
+    setRefineStep(0);
     const oldInput = refinementInput;
+    setRefineInstruction(oldInput);
     setRefinementInput('');
+
+    // Progress steps simulation
+    const stepTimers = [
+      setTimeout(() => setRefineStep(1), 1500),
+      setTimeout(() => setRefineStep(2), 4000),
+    ];
 
     try {
       const refined = await gemini.refineResult(result, oldInput);
+      stepTimers.forEach(clearTimeout);
       const newResult = { ...result, ...refined };
       setResult(newResult);
 
@@ -263,12 +276,17 @@ const App = () => {
       } catch (e) {
         console.error('Usage tracking failed:', e);
       }
+
+      // Show success toast
+      setIsRefining(false);
+      setShowRefineSuccess(true);
+      setTimeout(() => setShowRefineSuccess(false), 3000);
     } catch (e) {
       console.error(e);
       setRefinementInput(oldInput);
-      alert("調整に失敗しました。もう一度お試しください。");
-    } finally {
+      setRefineInstruction('');
       setIsRefining(false);
+      alert("調整に失敗しました。もう一度お試しください。");
     }
   };
 
@@ -510,7 +528,50 @@ const App = () => {
 
         {/* ===== RESULTS ===== */}
         {result && (currentState === AppState.RESULTS) && (
-          <div className="space-y-6 animate-fade-in-up">
+          <div className="space-y-6 animate-fade-in-up relative">
+
+            {/* Refining overlay */}
+            {isRefining && (
+              <div className="absolute inset-0 z-30 flex items-start justify-center pt-24 rounded-2xl">
+                <div className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm rounded-2xl" />
+                <div className="relative glass-card !p-6 rounded-2xl text-center space-y-4 max-w-xs animate-scale-in shadow-2xl shadow-purple-900/40">
+                  <div className="relative w-14 h-14 mx-auto">
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-violet-600 via-purple-500 to-fuchsia-500 animate-spin-slow opacity-30 blur-md" />
+                    <div className="absolute inset-1.5 rounded-full bg-slate-900/90 flex items-center justify-center">
+                      <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+                    </div>
+                  </div>
+                  <div>
+                    <h4 className="text-white font-semibold text-sm mb-1">アレンジ適用中...</h4>
+                    <p className="text-xs text-slate-400">
+                      {refineStep === 0 && '指示を解析しています'}
+                      {refineStep === 1 && 'プロンプトと歌詞を調整中'}
+                      {refineStep === 2 && '最終仕上げ中...'}
+                    </p>
+                  </div>
+                  <p className="text-[11px] text-purple-300/70 italic px-2 line-clamp-2">
+                    「{refineInstruction}」
+                  </p>
+                  <div className="flex gap-1.5 justify-center">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className={`h-1 rounded-full transition-all duration-500 ${
+                        i <= refineStep ? 'w-8 bg-purple-500' : 'w-4 bg-slate-700'
+                      }`} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Success toast */}
+            {showRefineSuccess && (
+              <div className="sticky top-20 z-40 flex justify-center animate-fade-in-down">
+                <div className="inline-flex items-center gap-2 px-5 py-3 bg-emerald-500/15 border border-emerald-500/30 rounded-xl text-sm shadow-lg shadow-emerald-900/20 backdrop-blur-md">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span className="text-emerald-300 font-medium">アレンジが完了しました</span>
+                </div>
+              </div>
+            )}
             
             {/* Song info badge */}
             {songDetails && (
@@ -612,6 +673,16 @@ const App = () => {
             {/* Refinement Chat */}
             <div className="sticky bottom-4 z-40" ref={bottomRef}>
               <Card className="shadow-2xl shadow-purple-900/30 border-purple-500/20 !bg-slate-900/90 backdrop-blur-2xl">
+                {isRefining && (
+                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-slate-800/50 animate-fade-in">
+                    <div className="flex gap-1">
+                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{animationDelay:'0ms'}} />
+                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{animationDelay:'150ms'}} />
+                      <span className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-bounce" style={{animationDelay:'300ms'}} />
+                    </div>
+                    <span className="text-xs text-purple-300 font-medium">アレンジを適用中...</span>
+                  </div>
+                )}
                 <div className="flex gap-3 items-center">
                   <div className="flex-1 min-w-0">
                     <input
