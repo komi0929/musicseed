@@ -6,8 +6,10 @@ import apiProxy from './server/vitePlugin';
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
 
-    // Validate API key at startup (but don't send it to the client!)
-    if (!env.GEMINI_API_KEY) {
+    // Set env for server-side API proxy (NOT exposed to client bundle)
+    if (env.GEMINI_API_KEY) {
+      process.env.GEMINI_API_KEY = env.GEMINI_API_KEY;
+    } else {
       console.warn('\n⚠️  GEMINI_API_KEY is not set in .env.local\n');
     }
 
