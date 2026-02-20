@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { v4 as uuidv4 } from 'uuid';
 
 const STORAGE_KEY = 'musicseed_user_id';
@@ -18,43 +18,57 @@ export const getUserId = (): string => {
 
 /**
  * Get current usage count from Supabase.
- * Returns 0 if no record exists yet.
+ * Returns 0 if Supabase is not configured or no record exists.
  */
 export const getUsageCount = async (): Promise<number> => {
-  const userId = getUserId();
-  
-  const { data, error } = await supabase
-    .from('usage')
-    .select('count')
-    .eq('user_id', userId)
-    .single();
+  if (!isSupabaseConfigured) return 0;
 
-  if (error && error.code === 'PGRST116') {
-    // No row found — first time user
+  try {
+    const userId = getUserId();
+    
+    const { data, error } = await supabase
+      .from('usage')
+      .select('count')
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code === 'PGRST116') {
+      // No row found — first time user
+      return 0;
+    }
+    if (error) {
+      console.warn('Usage count fetch error:', error.message);
+      return 0;
+    }
+    return data?.count ?? 0;
+  } catch (e) {
+    console.warn('Usage count fetch failed:', e);
     return 0;
   }
-  if (error) {
-    console.error('Usage count fetch error:', error);
-    return 0;
-  }
-  return data?.count ?? 0;
 };
 
 /**
  * Increment usage count. Creates record if first use.
- * Returns the new count.
+ * Returns the new count, or 0 if Supabase is not configured.
  */
 export const incrementUsage = async (): Promise<number> => {
-  const userId = getUserId();
-  
-  const { data, error } = await supabase
-    .rpc('increment_usage', { p_user_id: userId });
+  if (!isSupabaseConfigured) return 0;
 
-  if (error) {
-    console.error('Usage increment error:', error);
+  try {
+    const userId = getUserId();
+    
+    const { data, error } = await supabase
+      .rpc('increment_usage', { p_user_id: userId });
+
+    if (error) {
+      console.warn('Usage increment error:', error.message);
+      return 0;
+    }
+    return data ?? 0;
+  } catch (e) {
+    console.warn('Usage increment failed:', e);
     return 0;
   }
-  return data ?? 0;
 };
 
 /**
@@ -70,3 +84,4 @@ export const hasRemainingUses = async (): Promise<{ allowed: boolean; count: num
 };
 
 export const MAX_USES = MAX_USAGE;
+

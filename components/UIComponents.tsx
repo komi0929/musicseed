@@ -78,12 +78,16 @@ export const CopyBlock = ({ text, label }: { text: string; label: string }) => {
   const [copied, setCopied] = useState(false);
   const [flash, setFlash] = useState(false);
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setFlash(true);
-    setTimeout(() => setCopied(false), 2500);
-    setTimeout(() => setFlash(false), 500);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setFlash(true);
+      setTimeout(() => setCopied(false), 2500);
+      setTimeout(() => setFlash(false), 500);
+    } catch (e) {
+      console.warn('Clipboard write failed:', e);
+    }
   };
 
   return (

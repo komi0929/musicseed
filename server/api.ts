@@ -31,11 +31,14 @@ const parseJSON = (text: string | undefined): any => {
  * Sanitize user input — strips dangerous chars and limits length
  */
 const sanitize = (s: string, maxLen = 200): string =>
-  s.replace(/[`${}\\]/g, "").slice(0, maxLen);
+  s.replace(/[`${}\\"]/g, "").slice(0, maxLen);
 
 /**
  * Rate-limit map: IP -> { lastCall, callCount }
- * Simple in-memory per-process. Resets on server restart.
+ * Simple in-memory per-process. Resets on cold start.
+ * NOTE: On serverless (Vercel), each invocation may use a different instance,
+ * so this only provides partial protection. For full rate-limiting, use
+ * Vercel's built-in WAF or an external service (e.g., Upstash Redis).
  */
 const rateLimitMap = new Map<string, { ts: number; count: number }>();
 const RATE_WINDOW_MS = 60_000;  // 1-min window
@@ -97,13 +100,19 @@ export async function handleSearchSongs(body: any, ip: string) {
   const response = await getAI().models.generateContent({
     model: "gemini-2.5-flash",
     contents: prompt,
-    config: { tools: [{ googleSearch: {} }] },
+    config: {
+      tools: [{ googleSearch: {} }],
+      temperature: 0.5,
+    },
   });
 
   const parsed = parseJSON(response.text);
   if (!Array.isArray(parsed)) {
     if (parsed && typeof parsed === "object" && parsed.title) return [parsed];
-    return [];
+    throw { status: 404, message: "楽曲が見つかりませんでした" };
+  }
+  if (parsed.length === 0) {
+    throw { status: 404, message: "楽曲が見つかりませんでした" };
   }
   return parsed;
 }

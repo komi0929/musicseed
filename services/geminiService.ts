@@ -8,18 +8,29 @@ import { SongDetails, GeneratedResult } from "../types";
  * Helper: call the server-side proxy and handle errors.
  */
 const apiFetch = async <T>(endpoint: string, body: Record<string, unknown>): Promise<T> => {
-  const res = await fetch(`/api/${endpoint}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`/api/${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch (networkErr) {
+    throw new Error("ネットワークエラーが発生しました。接続を確認してください。");
+  }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Unknown error" }));
+    let errorMsg = `API error (${res.status})`;
+    try {
+      const err = await res.json();
+      errorMsg = err.error || errorMsg;
+    } catch {
+      // Response body was not JSON
+    }
     if (res.status === 429) {
       throw new Error("リクエスト制限に達しました。少し待ってから再試行してください。");
     }
-    throw new Error(err.error || `API error (${res.status})`);
+    throw new Error(errorMsg);
   }
 
   return res.json();

@@ -1,5 +1,0 @@
-{
-  "name": "musicseed",
-  "description": "既存の楽曲を深く分析し、Suno AI用の高品質なプロンプトを生成する高度なアシスタント。",
-  "requestFramePermissions": []
-}
